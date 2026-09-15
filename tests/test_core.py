@@ -5,6 +5,7 @@ from addrnorm.core import (
     abbreviate_street_suffix,
     format_address,
     normalize_state,
+    normalize_unit_designator,
     normalize_whitespace,
     normalize_zip,
     parse_address,
@@ -54,6 +55,23 @@ class AbbreviateStreetSuffixTest(unittest.TestCase):
         self.assertEqual(abbreviate_street_suffix("   "), "")
 
 
+class NormalizeUnitDesignatorTest(unittest.TestCase):
+    def test_known_designator(self):
+        self.assertEqual(normalize_unit_designator("Apartment 4B"), "Apt 4B")
+
+    def test_already_abbreviated_unchanged(self):
+        self.assertEqual(normalize_unit_designator("Ste 200"), "Ste 200")
+
+    def test_known_designator_building(self):
+        self.assertEqual(normalize_unit_designator("Building C"), "Bldg C")
+
+    def test_unrecognized_word_unchanged(self):
+        self.assertEqual(normalize_unit_designator("PO Box 12"), "PO Box 12")
+
+    def test_empty_line(self):
+        self.assertEqual(normalize_unit_designator("   "), "")
+
+
 class ParseAddressTest(unittest.TestCase):
     def test_two_line_address(self):
         address = parse_address(["123 Main Street", "Springfield, Illinois 62701"])
@@ -73,6 +91,16 @@ class ParseAddressTest(unittest.TestCase):
     def test_unparseable_last_line_raises(self):
         with self.assertRaises(ValueError):
             parse_address(["123 Main Street", "Springfield Illinois"])
+
+    def test_apartment_line(self):
+        address = parse_address(
+            ["123 Main Street", "Apartment 4B", "Springfield, IL 62701"]
+        )
+        self.assertEqual(address.street, "123 Main St Apt 4B")
+
+    def test_suite_line_already_abbreviated(self):
+        address = parse_address(["456 Oak Ave", "Ste 200", "Chicago, IL 60601"])
+        self.assertEqual(address.street, "456 Oak Ave Ste 200")
 
 
 class FormatAddressTest(unittest.TestCase):

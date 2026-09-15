@@ -37,6 +37,16 @@ State names and abbreviations are both accepted, case-insensitively.
 ZIP codes may be 5 digits or ZIP+4. Malformed input exits with status
 1 and an error on stderr instead of guessing.
 
+An apartment, suite, or unit line between the street and the
+city/state/zip line is folded into the street line, with its
+designator abbreviated:
+
+```
+$ printf '123 Main Street\nApartment 4B\nSpringfield, IL 62701\n' | python -m addrnorm.cli
+123 Main St Apt 4B
+Springfield, IL 62701
+```
+
 ## Library use
 
 The parsing and formatting logic lives in `addrnorm.core` as plain

@@ -40,6 +40,13 @@ STREET_SUFFIXES = {
     "way": "Way",
 }
 
+# Unit/apartment designators, USPS-style. Keyed lowercase, no punctuation.
+UNIT_DESIGNATORS = {
+    "apartment": "Apt", "building": "Bldg", "department": "Dept",
+    "floor": "Fl", "room": "Rm", "space": "Spc", "suite": "Ste",
+    "unit": "Unit",
+}
+
 ZIP_PATTERN = re.compile(r"^\d{5}(-\d{4})?$")
 CITY_STATE_ZIP_PATTERN = re.compile(
     r"^(?P<city>.+?),\s*(?P<state>[A-Za-z. ]+?)\s+(?P<zip>[\d-]+)$"
@@ -102,12 +109,32 @@ def abbreviate_street_suffix(street_line: str) -> str:
     return " ".join(words)
 
 
+def normalize_unit_designator(line: str) -> str:
+    """Abbreviate a leading unit/apartment/suite designator word.
+
+    "Apartment 4B" becomes "Apt 4B"; a line that doesn't start with a
+    known designator (including one already abbreviated) passes
+    through unchanged.
+    """
+    cleaned = normalize_whitespace(line)
+    if not cleaned:
+        return cleaned
+    words = cleaned.split(" ")
+    first_word = words[0].strip(".").lower()
+    abbreviation = UNIT_DESIGNATORS.get(first_word)
+    if abbreviation is None:
+        return cleaned
+    words[0] = abbreviation
+    return " ".join(words)
+
+
 def parse_address(lines: list[str]) -> Address:
     """Parse address lines into an Address.
 
-    Expects at least two non-empty lines: one or more street lines,
-    followed by a final "City, State ZIP" line. Raises ValueError if
-    the input doesn't fit that shape.
+    Expects at least two non-empty lines: a street line, optionally
+    followed by one or more unit/apartment lines, followed by a final
+    "City, State ZIP" line. Raises ValueError if the input doesn't fit
+    that shape.
     """
     non_empty = [line for line in lines if normalize_whitespace(line)]
     if len(non_empty) < 2:
@@ -118,7 +145,10 @@ def parse_address(lines: list[str]) -> Address:
     if match is None:
         raise ValueError(f"could not parse city/state/zip from: {last_line!r}")
 
-    street = abbreviate_street_suffix(" ".join(street_lines))
+    street_line, *unit_lines = street_lines
+    street = abbreviate_street_suffix(street_line)
+    for unit_line in unit_lines:
+        street = f"{street} {normalize_unit_designator(unit_line)}"
     city = normalize_whitespace(match.group("city"))
     state = normalize_state(match.group("state"))
     zip_code = normalize_zip(match.group("zip"))
